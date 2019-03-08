@@ -1,0 +1,33 @@
+This is just to give myself a few hints and pointers on how I solved challenges with DVWA
+(It will probably be a work in progress)
+
+:The Login Screen:
+
+On the login screen the first challenge is possible to ... invent. 
+We already know that the username and password is admin/password, so with that out of the way, a little look at the page reveals that simple brute forcing is ... bothersome.
+There is a CSRF token which is hidden in the page and updated with every GET request (spoiler, yes sorry - not sorry).
+You can find several places that replicate g0tmi1k (https://blog.g0tmi1k.com/dvwa/login/ and other links on that page) in relation to using bash-fu.
+I have opted to go for PowerShell as I haven't found it - yet.
+I am not planning on doing a full walkthrough, and I will probably not do all too much explaining.
+My setup is that I have "installed" the DVWA Docker image on the same Ubuntu box that I am running my experiments on. 
+I used 'snap install powershell --classic' to get powershell available on the box.
+
+::POWERSHELLING THE CSRF::
+
+// first set the 'cookie' - we will need a PHPSESSIONID set, so this is a great first step to have a container for a cookie 
+Invoke-WebRequest -Uri http://172.17.0.2/login.php -SessionVariable c00ky
+
+// Make a POST request where the output is captured and the 'user_token' is written to a variable. This is needed as there is a CSRF check on the page.
+$FullOut=(Invoke-WebRequest -Uri http://172.17.0.2/login.php -WebSession $c00ky -Method POST -Body @{username="admin";password="test";user_token=$temptoken;Login="Login"} ).Content.tostring() -split "[`r`n]"; $temptoken=(echo $FullOut | select-string "user_token" | foreach-object {$_ -split "user_token"}| Select-string -Pattern "value"| foreach-object {$_ -split "\' value=\'"}| foreach-object {$_ -split "\' \/\>"}| select-string -Pattern " " -NotMatch | out-string -nonewline); echo $tempToken; echo $FullOut
+
+/* Broken into the four parts (where there is a new full line command)
+$FullOut=(Invoke-WebRequest -Uri http://172.17.0.2/login.php -WebSession $c00ky -Method POST -Body @{username="admin";password="test";user_token=$tempToken;Login="Login"} ).Content.tostring() -split "[`r`n]"; 
+$tempToken=(echo $FullOut | select-string "user_token" | foreach-object {$_ -split "user_token"}| Select-string -Pattern "value"| foreach-object {$_ -split "\' value=\'"}| foreach-object {$_ -split "\' \/\>"}| select-string -Pattern " " -NotMatch | out-string -nonewline); 
+echo $tempToken; 
+echo $FullOut
+*/
+
+Now what may be missing?
+(something something for loop AND a dictionary in certain locations AND a check on successful cases)
+
+Note that I found tcpdump valuable (tcpdump -X) when looking a what transpired doing single calls. When it is in a for loop... well don't bother... maybe.
